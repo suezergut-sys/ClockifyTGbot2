@@ -1,0 +1,10 @@
+{
+  "users": [
+    {
+      "tgId": "376957179",
+      "clockifyEmail": "user@company.com",
+      "clockifyApiKey": "clockify_personal_api_key",
+      "active": true
+    }
+  ]
+}

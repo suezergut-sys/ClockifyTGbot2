@@ -1,0 +1,11 @@
+node_modules/
+.env
+.env.*
+!.env.example
+server.log
+ngrok.log
+run_server.bat
+*.pid
+.vscode/
+.DS_Store
+data/users.json

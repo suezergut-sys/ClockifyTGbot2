@@ -1,0 +1,226 @@
+{
+  "version": 2,
+  "createdAt": "2026-02-19T08:34:04.092Z",
+  "events": [
+    {
+      "id": "73e28aaa-eb5e-4fdf-bce3-396289a74158",
+      "ts": "2026-02-19T08:35:47.987Z",
+      "dateMsk": "19.02.2026 11:35:47",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "ad9d44b2-3a2a-4b2f-bad4-48641f3ccd41",
+      "ts": "2026-02-19T08:53:17.351Z",
+      "dateMsk": "19.02.2026 11:53:17",
+      "tgId": "541848217",
+      "email": "ilmakarov@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created_after_selection"
+    },
+    {
+      "id": "93b97d0f-a4e5-4bb7-8931-268cdb44db4e",
+      "ts": "2026-02-19T09:48:55.198Z",
+      "dateMsk": "19.02.2026 12:48:55",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "aedda235-595c-411d-9965-7deb3e9a2a45",
+      "ts": "2026-02-19T10:06:42.298Z",
+      "dateMsk": "19.02.2026 13:06:42",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "7ba5d265-06d0-4494-87ec-fbd13ddf841c",
+      "ts": "2026-02-19T10:08:10.342Z",
+      "dateMsk": "19.02.2026 13:08:10",
+      "tgId": "541848217",
+      "email": "ilmakarov@korusconsulting.ru",
+      "status": "failed",
+      "source": "voice",
+      "reason": "parse_failed"
+    },
+    {
+      "id": "b5f1cf70-914b-41c9-b29b-e1cc45f9c3ae",
+      "ts": "2026-02-19T10:10:09.140Z",
+      "dateMsk": "19.02.2026 13:10:09",
+      "tgId": "541848217",
+      "email": "ilmakarov@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "a31796ce-8d54-4730-868f-b3adb3d7edf5",
+      "ts": "2026-02-19T10:10:52.532Z",
+      "dateMsk": "19.02.2026 13:10:52",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "failed",
+      "source": "text",
+      "reason": "wrong_prefix_text"
+    },
+    {
+      "id": "a2436254-75c3-4b68-a8fd-67464cc02b00",
+      "ts": "2026-02-19T10:38:37.570Z",
+      "dateMsk": "19.02.2026 13:38:37",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "37baaaa9-1d7f-46f7-ad8b-fc26d26fd556",
+      "ts": "2026-02-19T10:39:05.005Z",
+      "dateMsk": "19.02.2026 13:39:05",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created_after_selection"
+    },
+    {
+      "id": "03a2401c-f6ae-4865-abfb-212a0636ba5e",
+      "ts": "2026-02-19T10:39:34.774Z",
+      "dateMsk": "19.02.2026 13:39:34",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "6a787d2c-c06e-4a26-8c61-c5addefee329",
+      "ts": "2026-02-19T10:40:05.489Z",
+      "dateMsk": "19.02.2026 13:40:05",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created_after_selection"
+    },
+    {
+      "id": "971a959b-0c0b-4169-87c6-7fd34a61626c",
+      "ts": "2026-02-19T10:40:38.067Z",
+      "dateMsk": "19.02.2026 13:40:38",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "b676e427-1a10-40d2-aedb-9c75ef4fdff0",
+      "ts": "2026-02-19T10:48:25.632Z",
+      "dateMsk": "19.02.2026 13:48:25",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "946ebad2-9dfd-4f6e-bef7-07f5f0a94dbd",
+      "ts": "2026-02-19T10:49:37.185Z",
+      "dateMsk": "19.02.2026 13:49:37",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created_after_selection"
+    },
+    {
+      "id": "c9d583b2-17bd-43e8-bb4a-a52af1167736",
+      "ts": "2026-02-20T09:37:32.739Z",
+      "dateMsk": "20.02.2026 12:37:32",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "failed",
+      "source": "voice",
+      "reason": "parse_failed"
+    },
+    {
+      "id": "8178084a-b9c5-469f-bbfe-dcd51e5aa58b",
+      "ts": "2026-02-20T09:40:16.428Z",
+      "dateMsk": "20.02.2026 12:40:16",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "041706d6-368b-44d8-b76d-ebb4311c8c77",
+      "ts": "2026-02-20T11:04:48.342Z",
+      "dateMsk": "20.02.2026 14:04:48",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "b79149e1-c713-4cd3-91f7-010eeefb5cc4",
+      "ts": "2026-02-20T13:26:58.794Z",
+      "dateMsk": "20.02.2026 16:26:58",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "failed",
+      "source": "voice",
+      "reason": "parse_failed"
+    },
+    {
+      "id": "90068c0f-32f5-47a3-96d4-bb6ff38b8c29",
+      "ts": "2026-02-20T13:26:59.094Z",
+      "dateMsk": "20.02.2026 16:26:59",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "failed",
+      "source": "text",
+      "reason": "wrong_prefix_text"
+    },
+    {
+      "id": "2970a849-0f2b-481b-9296-2b976c226488",
+      "ts": "2026-02-20T13:27:23.380Z",
+      "dateMsk": "20.02.2026 16:27:23",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created"
+    },
+    {
+      "id": "3ac42b77-8639-467d-bd32-61e1f22d01be",
+      "ts": "2026-02-20T13:27:44.833Z",
+      "dateMsk": "20.02.2026 16:27:44",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "failed",
+      "source": "voice",
+      "reason": "parse_failed"
+    },
+    {
+      "id": "33ae39c7-c3e8-4036-bb6b-81926e29d504",
+      "ts": "2026-02-20T13:28:06.030Z",
+      "dateMsk": "20.02.2026 16:28:06",
+      "tgId": "376957179",
+      "email": "msumin@korusconsulting.ru",
+      "status": "success",
+      "source": "voice",
+      "reason": "time_entry_created_after_selection"
+    }
+  ]
+}
