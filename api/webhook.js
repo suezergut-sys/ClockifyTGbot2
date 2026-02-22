@@ -367,7 +367,7 @@ async function handleCallback(cfg, telegram, callback) {
     await telegram.answerCallbackQuery(cq.id, "Отменено");
     await telegram.sendText(chatId, "Операция прервана. Попробуй прислать аудио сообщение заново.");
     if (pending.usageMeta) {
-      recordUsageEvent(cfg, {
+      await recordUsageEvent(cfg, {
         ...pending.usageMeta,
         status: "failed",
         reason: "user_canceled_selection"
@@ -390,7 +390,7 @@ async function handleCallback(cfg, telegram, callback) {
     const project = { id: candidate.id, name: candidate.name };
     const result = await createClockifyEntry(cfg, telegram, chatId, auth.user, pending.parsed, project);
     if (pending.usageMeta) {
-      recordUsageEvent(cfg, {
+      await recordUsageEvent(cfg, {
         ...pending.usageMeta,
         status: result && result.ok ? "success" : "failed",
         reason: result && result.ok ? "time_entry_created_after_selection" : ((result && result.reason) || "clockify_create_failed_after_selection")
@@ -419,7 +419,7 @@ function createWebhookHandler() {
     try {
       const cfg = getConfig();
       const telegram = createTelegramClient(cfg.telegramBotToken);
-      syncDashboardFiles(cfg);
+      await syncDashboardFiles(cfg);
       const update = await parseTelegramUpdate(req);
 
       const updateId = update && typeof update.update_id !== "undefined" ? update.update_id : null;
@@ -484,7 +484,7 @@ function createWebhookHandler() {
         });
         if (!stt.ok) {
           await telegram.sendText(chatId, stt.message || "Речь не распознана. Попробуйте ещё раз.");
-          recordUsageEvent(cfg, {
+          await recordUsageEvent(cfg, {
             ...usageMeta,
             status: "failed",
             reason: "stt_failed"
@@ -507,7 +507,7 @@ function createWebhookHandler() {
         ]);
         if (!looksLikeTrackingCommand(commandText) && !isReportCommand(commandText)) {
           await telegram.sendText(chatId, COMMAND_FORMAT_MESSAGE);
-          recordUsageEvent(cfg, {
+          await recordUsageEvent(cfg, {
             ...usageMeta,
             status: "failed",
             reason: "wrong_prefix_text"
@@ -517,7 +517,7 @@ function createWebhookHandler() {
         }
       } else {
         await telegram.sendText(chatId, COMMAND_FORMAT_MESSAGE);
-        recordUsageEvent(cfg, {
+        await recordUsageEvent(cfg, {
           ...usageMeta,
           status: "failed",
           reason: "empty_message"
@@ -531,7 +531,7 @@ function createWebhookHandler() {
           await telegram.sendText(chatId, "Команда отчета доступна только администратору.");
           return res.status(200).json({ ok: true, report: false, denied: true });
         }
-        const reportText = buildUsageReportMessage(cfg);
+        const reportText = await buildUsageReportMessage(cfg);
         await telegram.sendText(chatId, reportText);
         return res.status(200).json({ ok: true, report: true });
       }
@@ -539,7 +539,7 @@ function createWebhookHandler() {
       console.log("[webhook] command:processing", { revision, updateId });
       const outcome = await processCommand(cfg, telegram, chatId, tgUser, auth.user, commandText, usageMeta);
       if (outcome && outcome.final) {
-        recordUsageEvent(cfg, {
+        await recordUsageEvent(cfg, {
           ...usageMeta,
           status: outcome.status || "failed",
           reason: outcome.reason || "unknown"

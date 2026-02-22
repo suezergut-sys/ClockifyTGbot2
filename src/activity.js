@@ -5,6 +5,8 @@ const { DateTime } = require("luxon");
 const { loadUsers } = require("./store");
 
 const MEMORY_STATE_KEY = "__clockify_tg_bot_activity_state";
+const STORAGE_MODES = new Set(["file", "memory", "kv"]);
+let kvClient;
 
 function resolveFromRoot(relativePath) {
   return path.resolve(process.cwd(), relativePath);
@@ -14,16 +16,39 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function hasKvEnv() {
+  return Boolean(
+    String(process.env.KV_REST_API_URL || "").trim()
+    && String(process.env.KV_REST_API_TOKEN || "").trim()
+  );
+}
+
 function normalizeStorageMode(mode) {
   const value = String(mode || "").trim().toLowerCase();
-  if (value === "file" || value === "memory") {
+  if (STORAGE_MODES.has(value)) {
     return value;
   }
-  return process.env.VERCEL ? "memory" : "file";
+
+  if (process.env.VERCEL) {
+    return hasKvEnv() ? "kv" : "memory";
+  }
+
+  return "file";
 }
 
 function getStorageMode(cfg) {
   return normalizeStorageMode(cfg && cfg.activityStorage);
+}
+
+function getKvEventsKey(cfg) {
+  const prefix = String((cfg && cfg.activityKvPrefix) || "clockify_tg_bot_activity").trim() || "clockify_tg_bot_activity";
+  return `${prefix}:events`;
+}
+
+function getKvMaxEvents(cfg) {
+  const raw = Number((cfg && cfg.activityKvMaxEvents) || 5000);
+  if (!Number.isFinite(raw)) return 5000;
+  return Math.min(Math.max(Math.round(raw), 200), 20000);
 }
 
 function getPaths(cfg) {
@@ -66,6 +91,20 @@ function normalizeStateShape(state) {
   };
 }
 
+function createEvent(payload) {
+  const nowMsk = DateTime.now().setZone("Europe/Moscow");
+  return {
+    id: crypto.randomUUID(),
+    ts: nowMsk.toUTC().toISO(),
+    dateMsk: nowMsk.toFormat("dd.LL.yyyy HH:mm:ss"),
+    tgId: String(payload && payload.tgId ? payload.tgId : ""),
+    email: normalizeEmail(payload && payload.email ? payload.email : ""),
+    status: normalizeStatus(payload && payload.status ? payload.status : "failed"),
+    source: String(payload && payload.source ? payload.source : ""),
+    reason: String(payload && payload.reason ? payload.reason : "")
+  };
+}
+
 function readFileState(dataPath) {
   try {
     const raw = fs.readFileSync(dataPath, "utf8");
@@ -96,9 +135,72 @@ function setMemoryState(state) {
   return globalThis[MEMORY_STATE_KEY];
 }
 
-function readState(cfg) {
-  if (getStorageMode(cfg) === "memory") {
+function getKvClient() {
+  if (typeof kvClient !== "undefined") {
+    return kvClient;
+  }
+
+  if (!hasKvEnv()) {
+    kvClient = null;
+    return kvClient;
+  }
+
+  try {
+    // Lazy load to avoid hard dependency in environments without KV.
+    const mod = require("@vercel/kv");
+    kvClient = mod && mod.kv ? mod.kv : null;
+  } catch {
+    kvClient = null;
+  }
+
+  return kvClient;
+}
+
+function parseKvItem(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") {
+    return raw;
+  }
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
+}
+
+async function readKvState(cfg) {
+  const kv = getKvClient();
+  if (!kv) {
+    return createEmptyState();
+  }
+
+  try {
+    const key = getKvEventsKey(cfg);
+    const rawItems = await kv.lrange(key, 0, getKvMaxEvents(cfg) - 1);
+    const eventsNewestFirst = Array.isArray(rawItems)
+      ? rawItems.map(parseKvItem).filter(Boolean)
+      : [];
+
+    const eventsOldestFirst = eventsNewestFirst.reverse();
+    return normalizeStateShape({
+      version: 2,
+      createdAt: DateTime.utc().toISO(),
+      events: eventsOldestFirst
+    });
+  } catch (_err) {
+    return createEmptyState();
+  }
+}
+
+async function readState(cfg) {
+  const mode = getStorageMode(cfg);
+
+  if (mode === "memory") {
     return getMemoryState();
+  }
+
+  if (mode === "kv") {
+    return readKvState(cfg);
   }
 
   const { dataPath } = getPaths(cfg);
@@ -287,47 +389,78 @@ function writeDashboardHtml(indexPath, cfg, state) {
   fs.writeFileSync(indexPath, buildDashboardHtml(cfg, state), "utf8");
 }
 
-function persistState(cfg, state) {
+async function persistState(cfg, state) {
   const normalized = normalizeStateShape(state);
-  if (getStorageMode(cfg) === "memory") {
+  const mode = getStorageMode(cfg);
+
+  if (mode === "memory") {
     return setMemoryState(normalized);
   }
 
-  const { dataPath, csvPath, indexPath } = getPaths(cfg);
-  writeFileState(dataPath, normalized);
-  writeCsv(csvPath, normalized);
-  writeDashboardHtml(indexPath, cfg, normalized);
+  if (mode === "file") {
+    const { dataPath, csvPath, indexPath } = getPaths(cfg);
+    writeFileState(dataPath, normalized);
+    writeCsv(csvPath, normalized);
+    writeDashboardHtml(indexPath, cfg, normalized);
+    return normalized;
+  }
+
   return normalized;
 }
 
-function syncDashboardFiles(cfg) {
-  const state = readState(cfg);
-  return persistState(cfg, state);
+async function syncDashboardFiles(cfg) {
+  const mode = getStorageMode(cfg);
+  const state = await readState(cfg);
+
+  if (mode === "file") {
+    return persistState(cfg, state);
+  }
+
+  return state;
 }
 
-function recordUsageEvent(cfg, payload) {
-  const nowMsk = DateTime.now().setZone("Europe/Moscow");
-  const state = readState(cfg);
+async function recordUsageEvent(cfg, payload) {
+  const event = createEvent(payload);
+  const mode = getStorageMode(cfg);
 
-  const event = {
-    id: crypto.randomUUID(),
-    ts: nowMsk.toUTC().toISO(),
-    dateMsk: nowMsk.toFormat("dd.LL.yyyy HH:mm:ss"),
-    tgId: String(payload && payload.tgId ? payload.tgId : ""),
-    email: normalizeEmail(payload && payload.email ? payload.email : ""),
-    status: normalizeStatus(payload && payload.status ? payload.status : "failed"),
-    source: String(payload && payload.source ? payload.source : ""),
-    reason: String(payload && payload.reason ? payload.reason : "")
-  };
+  if (mode === "kv") {
+    const kv = getKvClient();
+    if (kv) {
+      try {
+        await kv.lpush(getKvEventsKey(cfg), JSON.stringify(event));
+        await kv.ltrim(getKvEventsKey(cfg), 0, getKvMaxEvents(cfg) - 1);
+        return event;
+      } catch (_err) {
+        // Fall through to in-memory fallback to avoid losing event completely.
+      }
+    }
+  }
 
+  const state = await readState(cfg);
   state.events.push(event);
-  persistState(cfg, state);
+  await persistState(cfg, state);
   return event;
 }
 
-function buildUsageReportMessage(cfg) {
-  const state = readState(cfg);
-  const rows = buildSummaryRows(cfg, state);
+async function getUsageSnapshot(cfg, options) {
+  const state = await readState(cfg);
+  const summaryRows = buildSummaryRows(cfg, state);
+  const eventLimitRaw = Number(options && options.eventLimit ? options.eventLimit : 200);
+  const eventLimit = Math.min(Math.max(Math.round(eventLimitRaw), 1), 1000);
+  const recentEvents = state.events.slice(-eventLimit).reverse();
+
+  return {
+    generatedAt: DateTime.utc().toISO(),
+    storage: getStorageMode(cfg),
+    totalEvents: state.events.length,
+    summaryRows,
+    events: recentEvents
+  };
+}
+
+async function buildUsageReportMessage(cfg) {
+  const snapshot = await getUsageSnapshot(cfg, { eventLimit: 500 });
+  const rows = snapshot.summaryRows;
   const lines = ["Пользователь (email) | Сегодня | Всего |"];
 
   for (const row of rows) {
@@ -341,8 +474,8 @@ function buildUsageReportMessage(cfg) {
   return lines.join("\n");
 }
 
-function incrementSuccessByEmail(cfg, email) {
-  recordUsageEvent(cfg, {
+async function incrementSuccessByEmail(cfg, email) {
+  await recordUsageEvent(cfg, {
     email,
     status: "success",
     source: "legacy",
@@ -354,6 +487,7 @@ function incrementSuccessByEmail(cfg, email) {
 module.exports = {
   syncDashboardFiles,
   recordUsageEvent,
+  getUsageSnapshot,
   buildUsageReportMessage,
   incrementSuccessByEmail
 };

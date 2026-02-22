@@ -12,7 +12,11 @@ function must(name) {
 
 function getConfig() {
   const activityStorageRaw = String(process.env.ACTIVITY_STORAGE || "").trim().toLowerCase();
-  const activityStorage = activityStorageRaw || (process.env.VERCEL ? "memory" : "file");
+  const hasKvEnv = Boolean(
+    String(process.env.KV_REST_API_URL || "").trim()
+    && String(process.env.KV_REST_API_TOKEN || "").trim()
+  );
+  const activityStorage = activityStorageRaw || (process.env.VERCEL ? (hasKvEnv ? "kv" : "memory") : "file");
   const interactiveSelectionRaw = String(process.env.INTERACTIVE_SELECTION || "").trim().toLowerCase();
   const interactiveSelection = interactiveSelectionRaw
     ? interactiveSelectionRaw === "true"
@@ -37,6 +41,8 @@ function getConfig() {
     moscowTz: "Europe/Moscow",
     interactiveSelection,
     activityStorage,
+    activityKvPrefix: process.env.ACTIVITY_KV_PREFIX || "clockify_tg_bot_activity",
+    activityKvMaxEvents: Number(process.env.ACTIVITY_KV_MAX_EVENTS || 5000),
     activityDataPath: process.env.ACTIVITY_DATA_PATH || "./data/activity.json",
     activityTablePath: process.env.ACTIVITY_TABLE_PATH || "./data/activity.csv",
     activityDashboardPath: process.env.ACTIVITY_DASHBOARD_PATH || "./index.html"

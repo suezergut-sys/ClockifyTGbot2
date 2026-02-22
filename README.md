@@ -4,7 +4,7 @@ Telegram-бот для занесения времени в Clockify из гол
 
 Проект подготовлен для двух режимов:
 - `local` (через `server.js`)
-- `Vercel serverless` (через `api/webhook.js` и `api/health.js`)
+- `Vercel serverless` (через `api/webhook.js`, `api/health.js`, `api/stats.js`)
 
 ## Что делает бот
 
@@ -18,8 +18,10 @@ Telegram-бот для занесения времени в Clockify из гол
 
 ## Важные изменения для Vercel
 
-- Добавлен безопасный режим хранения активности: `ACTIVITY_STORAGE=memory`.
-- В режиме `memory` бот не пишет в файловую систему (важно для Vercel).
+- Добавлен live-дашборд статистики на `/` с автообновлением каждые 10 секунд.
+- Добавлен API для дашборда: `GET /api/stats`.
+- Для shared-хранилища между serverless-инстансами используется `ACTIVITY_STORAGE=kv` (Vercel KV / Upstash Redis).
+- В режиме `memory` бот работает, но статистика не разделяется между инстансами.
 - На Vercel по умолчанию отключен интерактивный выбор проекта: `INTERACTIVE_SELECTION=false`.
 - Парсинг `req.body` в webhook сделан устойчивым для разных runtime-вариантов.
 
@@ -27,8 +29,9 @@ Telegram-бот для занесения времени в Clockify из гол
 
 - `api/webhook.js` - основной webhook-хендлер.
 - `api/health.js` - health-check и проверка env.
+- `api/stats.js` - JSON-данные для дашборда статистики.
 - `src/config.js` - централизованная конфигурация env.
-- `src/activity.js` - учет обращений (`file` или `memory` storage).
+- `src/activity.js` - учет обращений (`file`, `memory`, `kv` storage).
 - `src/stt.js` - распознавание голоса через OpenAI.
 - `src/parser.js`, `src/aiParser.js` - парсинг команд.
 - `src/clockify.js` - работа с Clockify API.
@@ -60,7 +63,9 @@ Telegram-бот для занесения времени в Clockify из гол
 - `BASE_TZ=Europe/Belgrade`
 - `PENDING_TTL_MS=900000`
 - `INTERACTIVE_SELECTION=false` (для Vercel)
-- `ACTIVITY_STORAGE=memory` (для Vercel)
+- `ACTIVITY_STORAGE=kv` (для Vercel live-дашборда)
+- `ACTIVITY_KV_PREFIX=clockify_tg_bot_activity`
+- `ACTIVITY_KV_MAX_EVENTS=5000`
 
 ## Локальный env для копирования в Vercel
 
@@ -117,11 +122,16 @@ git push -u origin main
 - `Project Settings -> Environment Variables`
 
 Для прод-окружения обязательно поставьте:
-- `ACTIVITY_STORAGE=memory`
+- `ACTIVITY_STORAGE=kv`
 - `INTERACTIVE_SELECTION=false`
 
 Для allow-list пользователей на Vercel рекомендуется:
 - `USERS_JSON` (вместо `USERS_DATA_PATH`)
+
+Для live-дашборда подключите хранилище:
+1. Vercel -> `Storage` -> `Create` -> `Upstash Redis` (или существующий Redis integration).
+2. Подвяжите storage к проекту `clockifytgbot2`.
+3. Убедитесь, что в env появились `KV_REST_API_URL` и `KV_REST_API_TOKEN`.
 
 Пример `USERS_JSON`:
 
@@ -160,7 +170,9 @@ npm run webhook:info
 
 1. Откройте `https://<your-vercel-domain>/api/health`.
 2. Убедитесь, что `ready: true`.
-3. Отправьте команду боту из разрешенного аккаунта Telegram.
+3. Откройте `https://<your-vercel-domain>/` и убедитесь, что дашборд загружается.
+4. Отправьте команду боту из разрешенного аккаунта Telegram.
+5. Проверьте, что на `/` появились новые события (обычно в течение 10 секунд).
 
 ## Типовые проблемы
 
@@ -173,8 +185,11 @@ npm run webhook:info
 - `403` от Clockify:
   у пользователя нет корректного персонального `clockifyApiKey`, либо не подходит fallback-ключ.
 
+- Дашборд не обновляется:
+  проверьте `ACTIVITY_STORAGE=kv` и наличие `KV_REST_API_URL` + `KV_REST_API_TOKEN`.
+
 - Потеря статистики активности на Vercel:
-  это ожидаемо при `ACTIVITY_STORAGE=memory` (serverless без постоянного диска).
+  это ожидаемо при `ACTIVITY_STORAGE=memory` (serverless без общего постоянного состояния).
 
 - Кнопки выбора проекта в неоднозначных случаях не показываются на Vercel:
   это ожидаемо при `INTERACTIVE_SELECTION=false`; укажите точное название проекта в повторной команде.

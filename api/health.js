@@ -4,18 +4,27 @@ function hasEnv(name) {
 
 module.exports = async function health(_req, res) {
   const usersSource = hasEnv("USERS_JSON") ? "USERS_JSON" : (hasEnv("USERS_DATA_PATH") ? "USERS_DATA_PATH" : "none");
-  const activityStorage = String(process.env.ACTIVITY_STORAGE || "").trim().toLowerCase() || (process.env.VERCEL ? "memory" : "file");
-  const env = {
+  const hasKv = hasEnv("KV_REST_API_URL") && hasEnv("KV_REST_API_TOKEN");
+  const activityStorage = String(process.env.ACTIVITY_STORAGE || "").trim().toLowerCase() || (process.env.VERCEL ? (hasKv ? "kv" : "memory") : "file");
+  const coreEnv = {
     TELEGRAM_BOT_TOKEN: hasEnv("TELEGRAM_BOT_TOKEN"),
     OPENAI_API_KEY: hasEnv("OPENAI_API_KEY"),
     CLOCKIFY_API_KEY: hasEnv("CLOCKIFY_API_KEY"),
     CLOCKIFY_WORKSPACE_ID: hasEnv("CLOCKIFY_WORKSPACE_ID"),
-    USERS_JSON_OR_PATH: hasEnv("USERS_JSON") || hasEnv("USERS_DATA_PATH"),
-    INTERACTIVE_SELECTION: hasEnv("INTERACTIVE_SELECTION") || Boolean(process.env.VERCEL),
-    ACTIVITY_STORAGE: Boolean(activityStorage)
+    USERS_JSON_OR_PATH: hasEnv("USERS_JSON") || hasEnv("USERS_DATA_PATH")
   };
 
-  const ready = Object.values(env).every(Boolean);
+  const env = {
+    ...coreEnv,
+    INTERACTIVE_SELECTION: hasEnv("INTERACTIVE_SELECTION") || Boolean(process.env.VERCEL),
+    ACTIVITY_STORAGE: Boolean(activityStorage),
+    KV_REST_API_URL: hasEnv("KV_REST_API_URL"),
+    KV_REST_API_TOKEN: hasEnv("KV_REST_API_TOKEN")
+  };
+
+  const coreReady = Object.values(coreEnv).every(Boolean);
+  const storageReady = activityStorage !== "kv" || hasKv;
+  const ready = coreReady && storageReady;
   res.status(200).json({
     ok: true,
     service: "clockify-tg-bot",

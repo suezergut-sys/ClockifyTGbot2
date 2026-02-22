@@ -1,65 +1,260 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ClockifyTGbot — Востребованность</title>
+  <title>ClockifyTGbot - Статистика использования</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 24px; background: #f5f7fb; color: #1f2937; }
-    .card { max-width: 1080px; margin: 0 auto 18px auto; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.08); }
-    h1, h2 { margin-top: 0; }
-    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
-    th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e5e7eb; }
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+      --ok: #15803d;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 15px/1.4 Arial, sans-serif;
+    }
+
+    .wrap {
+      max-width: 1120px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    h1, h2 {
+      margin: 0 0 10px;
+    }
+
+    .meta {
+      color: var(--muted);
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .status {
+      display: inline-block;
+      background: #ecfeff;
+      border: 1px solid #99f6e4;
+      color: #0f766e;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      margin-right: 8px;
+    }
+
+    .status.error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: var(--danger);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    th {
+      font-weight: 700;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .pill {
+      font-size: 12px;
+      border-radius: 999px;
+      padding: 2px 8px;
+      color: #fff;
+      display: inline-block;
+    }
+
+    .pill.ok {
+      background: var(--ok);
+    }
+
+    .pill.failed {
+      background: var(--danger);
+    }
+
+    .empty {
+      color: var(--muted);
+      padding: 12px 0;
+    }
+
+    @media (max-width: 760px) {
+      .wrap {
+        padding: 12px;
+      }
+
+      th, td {
+        padding: 8px;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Востребованность бота</h1>
-    <p>Данные по обращениям с разбивкой по пользователям. Сегодня считается с 00:00 по Москве.</p>
-    <table>
-      <thead>
-        <tr><th>Пользователь (email)</th><th>Обращений сегодня</th><th>Обращений всего</th><th>Успешно</th><th>Неуспешно</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>ausikova@korusconsulting.ru</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-        <tr><td>ilmakarov@korusconsulting.ru</td><td>0</td><td>3</td><td>2</td><td>1</td></tr>
-        <tr><td>kkalabushkina@korusconsulting.ru</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-        <tr><td>msumin@korusconsulting.ru</td><td>8</td><td>19</td><td>14</td><td>5</td></tr>
-        <tr><td>tkulbyakina@korusconsulting.ru</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
-      </tbody>
-    </table>
+  <div class="wrap">
+    <div class="card">
+      <h1>Статистика ClockifyTGbot</h1>
+      <div class="meta">
+        <span id="statusBadge" class="status">Загрузка...</span>
+        <span id="storageMode"></span>
+      </div>
+      <div class="meta" id="lastUpdate">Последнее обновление: -</div>
+    </div>
+
+    <div class="card">
+      <h2>Востребованность бота</h2>
+      <div class="meta">Агрегация по пользователям: сегодня, всего, успешно, неуспешно.</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Пользователь</th>
+            <th>Сегодня</th>
+            <th>Всего</th>
+            <th>Успешно</th>
+            <th>Неуспешно</th>
+          </tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+      <div id="summaryEmpty" class="empty" style="display:none;">Нет данных</div>
+    </div>
+
+    <div class="card">
+      <h2>Последние обращения</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Дата (MSK)</th>
+            <th>Статус</th>
+            <th>Пользователь</th>
+            <th>Источник</th>
+            <th>Причина</th>
+          </tr>
+        </thead>
+        <tbody id="eventsBody"></tbody>
+      </table>
+      <div id="eventsEmpty" class="empty" style="display:none;">Нет событий</div>
+    </div>
   </div>
-  <div class="card">
-    <h2>Последние обращения</h2>
-    <table>
-      <thead>
-        <tr><th>Дата обращения (MSK)</th><th>Статус</th><th>Пользователь</th><th>Причина</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>20.02.2026 16:28:06</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created_after_selection</td></tr>
-        <tr><td>20.02.2026 16:27:44</td><td>Неуспешно</td><td>msumin@korusconsulting.ru</td><td>parse_failed</td></tr>
-        <tr><td>20.02.2026 16:27:23</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>20.02.2026 16:26:59</td><td>Неуспешно</td><td>msumin@korusconsulting.ru</td><td>wrong_prefix_text</td></tr>
-        <tr><td>20.02.2026 16:26:58</td><td>Неуспешно</td><td>msumin@korusconsulting.ru</td><td>parse_failed</td></tr>
-        <tr><td>20.02.2026 14:04:48</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>20.02.2026 12:40:16</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>20.02.2026 12:37:32</td><td>Неуспешно</td><td>msumin@korusconsulting.ru</td><td>parse_failed</td></tr>
-        <tr><td>19.02.2026 13:49:37</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created_after_selection</td></tr>
-        <tr><td>19.02.2026 13:48:25</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 13:40:38</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 13:40:05</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created_after_selection</td></tr>
-        <tr><td>19.02.2026 13:39:34</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 13:39:05</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created_after_selection</td></tr>
-        <tr><td>19.02.2026 13:38:37</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 13:10:52</td><td>Неуспешно</td><td>msumin@korusconsulting.ru</td><td>wrong_prefix_text</td></tr>
-        <tr><td>19.02.2026 13:10:09</td><td>Успешно</td><td>ilmakarov@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 13:08:10</td><td>Неуспешно</td><td>ilmakarov@korusconsulting.ru</td><td>parse_failed</td></tr>
-        <tr><td>19.02.2026 13:06:42</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 12:48:55</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-        <tr><td>19.02.2026 11:53:17</td><td>Успешно</td><td>ilmakarov@korusconsulting.ru</td><td>time_entry_created_after_selection</td></tr>
-        <tr><td>19.02.2026 11:35:47</td><td>Успешно</td><td>msumin@korusconsulting.ru</td><td>time_entry_created</td></tr>
-      </tbody>
-    </table>
-  </div>
+
+  <script>
+    function escapeHtml(value) {
+      return String(value == null ? "" : value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+
+    function formatStatus(status) {
+      return String(status || "").toLowerCase() === "success" ? "Успешно" : "Неуспешно";
+    }
+
+    function setStatus(ok, message) {
+      var badge = document.getElementById("statusBadge");
+      badge.textContent = message;
+      badge.className = ok ? "status" : "status error";
+    }
+
+    function renderSummary(rows) {
+      var body = document.getElementById("summaryBody");
+      var empty = document.getElementById("summaryEmpty");
+
+      if (!rows || !rows.length) {
+        body.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+      body.innerHTML = rows.map(function(row) {
+        return "<tr>"
+          + "<td>" + escapeHtml(row.label) + "</td>"
+          + "<td>" + Number(row.today || 0) + "</td>"
+          + "<td>" + Number(row.total || 0) + "</td>"
+          + "<td>" + Number(row.success || 0) + "</td>"
+          + "<td>" + Number(row.failed || 0) + "</td>"
+          + "</tr>";
+      }).join("");
+    }
+
+    function renderEvents(events) {
+      var body = document.getElementById("eventsBody");
+      var empty = document.getElementById("eventsEmpty");
+
+      if (!events || !events.length) {
+        body.innerHTML = "";
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+      body.innerHTML = events.map(function(item) {
+        var ok = String(item.status || "").toLowerCase() === "success";
+        var statusClass = ok ? "pill ok" : "pill failed";
+
+        return "<tr>"
+          + "<td>" + escapeHtml(item.dateMsk || "") + "</td>"
+          + "<td><span class='" + statusClass + "'>" + formatStatus(item.status) + "</span></td>"
+          + "<td>" + escapeHtml(item.email || item.tgId || "") + "</td>"
+          + "<td>" + escapeHtml(item.source || "") + "</td>"
+          + "<td>" + escapeHtml(item.reason || "") + "</td>"
+          + "</tr>";
+      }).join("");
+    }
+
+    async function loadStats() {
+      try {
+        var res = await fetch("/api/stats", { cache: "no-store" });
+        if (!res.ok) {
+          throw new Error("HTTP " + res.status);
+        }
+
+        var data = await res.json();
+        if (!data || !data.ok) {
+          throw new Error("Invalid response");
+        }
+
+        document.getElementById("storageMode").textContent = "Хранилище: " + String(data.storage || "unknown");
+        document.getElementById("lastUpdate").textContent = "Последнее обновление: " + new Date().toLocaleString("ru-RU");
+
+        renderSummary(Array.isArray(data.summary) ? data.summary : []);
+        renderEvents(Array.isArray(data.recentEvents) ? data.recentEvents : []);
+        setStatus(true, "Данные обновлены");
+      } catch (err) {
+        setStatus(false, "Ошибка обновления: " + (err && err.message ? err.message : "unknown"));
+      }
+    }
+
+    loadStats();
+    setInterval(loadStats, 10000);
+  </script>
 </body>
 </html>
