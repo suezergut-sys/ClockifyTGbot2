@@ -11,3 +11,5 @@ run_server.bat
 .vscode/
 .DS_Store
 data/users.json
+
+.vercel
