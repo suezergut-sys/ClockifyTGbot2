@@ -4,6 +4,8 @@ node_modules/
 !.env.example
 server.log
 ngrok.log
+local-bot.log
+local-bot.err
 run_server.bat
 *.pid
 .vscode/
