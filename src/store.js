@@ -1,14 +1,63 @@
-const fs = require("fs");
+﻿const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
 const pending = new Map();
+let kvClient;
 
 function resolvePath(filePath) {
   if (path.isAbsolute(filePath)) {
     return filePath;
   }
   return path.resolve(process.cwd(), filePath);
+}
+
+function hasKvEnv() {
+  return Boolean(
+    String(process.env.KV_REST_API_URL || "").trim()
+    && String(process.env.KV_REST_API_TOKEN || "").trim()
+  );
+}
+
+function getKvClient() {
+  if (typeof kvClient !== "undefined") {
+    return kvClient;
+  }
+
+  if (!hasKvEnv()) {
+    kvClient = null;
+    return kvClient;
+  }
+
+  try {
+    const mod = require("@vercel/kv");
+    kvClient = mod && mod.kv ? mod.kv : null;
+  } catch {
+    kvClient = null;
+  }
+
+  return kvClient;
+}
+
+function getPendingKvPrefix(cfg) {
+  const value = String((cfg && cfg.pendingKvPrefix) || "clockify_tg_bot_pending").trim();
+  return value || "clockify_tg_bot_pending";
+}
+
+function getPendingKvKey(cfg, id) {
+  return `${getPendingKvPrefix(cfg)}:${String(id || "")}`;
+}
+
+function parsePendingItem(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") {
+    return raw;
+  }
+  try {
+    return JSON.parse(String(raw));
+  } catch {
+    return null;
+  }
 }
 
 function loadUsers(cfg) {
@@ -58,16 +107,49 @@ function getUserByTelegram(cfg, telegramUser) {
   );
 }
 
-function createPending(payload, ttlMs) {
+async function createPending(cfg, payload, ttlMs) {
   const id = crypto.randomBytes(6).toString("base64url");
-  pending.set(id, {
+  const item = {
     ...payload,
     expiresAt: Date.now() + ttlMs
-  });
+  };
+
+  const kv = getKvClient();
+  if (kv) {
+    try {
+      const ttlSeconds = Math.max(1, Math.ceil(Number(ttlMs) / 1000));
+      await kv.set(getPendingKvKey(cfg, id), JSON.stringify(item), { ex: ttlSeconds });
+      return id;
+    } catch {
+      // Fallback to in-memory map.
+    }
+  }
+
+  pending.set(id, item);
   return id;
 }
 
-function getPending(id) {
+async function getPending(cfg, id) {
+  const kv = getKvClient();
+  if (kv) {
+    try {
+      const raw = await kv.get(getPendingKvKey(cfg, id));
+      const item = parsePendingItem(raw);
+      if (!item) {
+        return null;
+      }
+
+      if (Date.now() > Number(item.expiresAt || 0)) {
+        await kv.del(getPendingKvKey(cfg, id));
+        return null;
+      }
+
+      return item;
+    } catch {
+      // Fallback to in-memory map.
+    }
+  }
+
   const item = pending.get(id);
   if (!item) {
     return null;
@@ -79,11 +161,22 @@ function getPending(id) {
   return item;
 }
 
-function deletePending(id) {
+async function deletePending(cfg, id) {
+  const kv = getKvClient();
+  if (kv) {
+    try {
+      await kv.del(getPendingKvKey(cfg, id));
+      return;
+    } catch {
+      // Fallback to in-memory map.
+    }
+  }
+
   pending.delete(id);
 }
 
-function prunePending() {
+async function prunePending(_cfg) {
+  // KV entries are pruned by Redis TTL.
   const now = Date.now();
   for (const [id, value] of pending.entries()) {
     if (now > value.expiresAt) {

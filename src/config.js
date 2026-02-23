@@ -20,7 +20,7 @@ function getConfig() {
   const interactiveSelectionRaw = String(process.env.INTERACTIVE_SELECTION || "").trim().toLowerCase();
   const interactiveSelection = interactiveSelectionRaw
     ? interactiveSelectionRaw === "true"
-    : !Boolean(process.env.VERCEL);
+    : (process.env.VERCEL ? hasKvEnv : true);
 
   return {
     telegramBotToken: must("TELEGRAM_BOT_TOKEN"),
@@ -37,6 +37,7 @@ function getConfig() {
     debugProjectTop: Number(process.env.DEBUG_PROJECT_TOP || 5),
     reportOwnerTgId: String(process.env.REPORT_OWNER_TG_ID || "376957179").trim(),
     pendingTtlMs: Number(process.env.PENDING_TTL_MS || 900000),
+    pendingKvPrefix: process.env.PENDING_KV_PREFIX || "clockify_tg_bot_pending",
     baseTz: process.env.BASE_TZ || "Europe/Belgrade",
     moscowTz: "Europe/Moscow",
     interactiveSelection,

@@ -193,7 +193,8 @@ async function resolveProject(cfg, telegram, chatId, telegramUserId, parsed, usa
       return { ok: false, final: true, reason: "project_choice_required_exact_name" };
     }
 
-    const pendingId = createPending(
+    const pendingId = await createPending(
+      cfg,
       {
         type: "project",
         ownerTelegramId: telegramUserId,
@@ -351,7 +352,7 @@ async function handleCallback(cfg, telegram, callback) {
     return;
   }
 
-  const pending = getPending(parsedData.pendingId);
+  const pending = await getPending(cfg, parsedData.pendingId);
   if (!pending) {
     await telegram.answerCallbackQuery(cq.id, "Выбор устарел");
     return;
@@ -363,7 +364,7 @@ async function handleCallback(cfg, telegram, callback) {
   }
 
   if (parsedData.type === "cancel") {
-    deletePending(parsedData.pendingId);
+    await deletePending(cfg, parsedData.pendingId);
     await telegram.answerCallbackQuery(cq.id, "Отменено");
     await telegram.sendText(chatId, "Операция прервана. Попробуй прислать аудио сообщение заново.");
     if (pending.usageMeta) {
@@ -385,7 +386,7 @@ async function handleCallback(cfg, telegram, callback) {
   await telegram.answerCallbackQuery(cq.id, "Принято");
 
   if (pending.type === "project" && parsedData.type === "project") {
-    deletePending(parsedData.pendingId);
+    await deletePending(cfg, parsedData.pendingId);
 
     const project = { id: candidate.id, name: candidate.name };
     const result = await createClockifyEntry(cfg, telegram, chatId, auth.user, pending.parsed, project);
@@ -414,10 +415,9 @@ function createWebhookHandler() {
       return res.status(405).send("Method not allowed");
     }
 
-    prunePending();
-
     try {
       const cfg = getConfig();
+      await prunePending(cfg);
       const telegram = createTelegramClient(cfg.telegramBotToken);
       await syncDashboardFiles(cfg);
       const update = await parseTelegramUpdate(req);
