@@ -80,6 +80,63 @@ function hasExplicitDateReference(text) {
     || /(^|\s)(monday|tuesday|wednesday|thursday|friday|saturday|sunday)(\s|$)/i.test(source);
 }
 
+function extractProjectLabelSegment(text) {
+  const source = normalizeText(text);
+  if (!source) return "";
+  const match = source.match(/(?:^|\s)(?:project|проект)\s+(.+?)(?=\s(?:task|работа|задача)(?:\s|$)|$)/iu);
+  return match ? String(match[1] || "").trim() : "";
+}
+
+function hasNumericMarker(text) {
+  const source = normalizeText(text).toLowerCase();
+  if (!source) return false;
+  if (/\b\d{1,4}\b/.test(source)) return true;
+  return /\b(?=[ivxlcdm]+\b)[ivxlcdm]{1,8}\b/i.test(source);
+}
+
+function extractNumericMarkers(text) {
+  const source = normalizeText(text);
+  if (!source) return [];
+
+  const tokens = source.split(/\s+/).filter(Boolean);
+  const out = [];
+  const seen = new Set();
+
+  for (const token of tokens) {
+    if (/^\d{1,4}$/.test(token)) {
+      if (!seen.has(token)) {
+        seen.add(token);
+        out.push(token);
+      }
+      continue;
+    }
+
+    if (/^(?=[ivxlcdm]+$)[ivxlcdm]{1,8}$/i.test(token)) {
+      const upper = token.toUpperCase();
+      if (!seen.has(upper)) {
+        seen.add(upper);
+        out.push(upper);
+      }
+    }
+  }
+
+  return out;
+}
+
+function enrichProjectQueryWithSourceNumerals(commandText, projectQuery) {
+  const query = String(projectQuery || "").trim();
+  if (!query) return query;
+  if (hasNumericMarker(query)) return query;
+
+  const segment = extractProjectLabelSegment(commandText);
+  if (!segment) return query;
+
+  const markers = extractNumericMarkers(segment);
+  if (!markers.length) return query;
+
+  return `${query} ${markers.join(" ")}`.trim();
+}
+
 async function sendDebug(telegram, chatId, cfg, lines) {
   if (!cfg.debugBotFlow) return;
   const message = ["[debug]", ...lines].join("\n");
@@ -281,6 +338,7 @@ async function processCommand(cfg, telegram, chatId, telegramUser, bindingUser, 
   }
 
   if (parsed.ok) {
+    parsed.value.projectQuery = enrichProjectQueryWithSourceNumerals(commandText, parsed.value.projectQuery);
     await sendDebug(telegram, chatId, cfg, [
       `parser: ${parserUsed}`,
       `projectQuery: ${parsed.value.projectQuery}`,
