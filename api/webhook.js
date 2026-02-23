@@ -591,7 +591,8 @@ async function createClockifyEntry(cfg, telegram, chatId, bindingUser, parsed, p
         startMskView: parsed.startMskView,
         endMskView: parsed.endMskView,
         durationView: formatMinutes(parsed.durationMinutes)
-      })
+      }),
+      { parse_mode: "HTML" }
     );
     return { ok: true };
   } catch (err) {

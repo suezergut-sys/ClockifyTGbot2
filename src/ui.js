@@ -16,13 +16,20 @@
   return rows;
 }
 
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
 function successMessage(result) {
   return [
-    "Создана запись в Clockify",
-    `Проект: ${result.projectName}`,
-    `Детализация: ${result.taskName}`,
-    `Время начала: ${result.startMskView}`,
-    `Длительность: ${result.durationView}`,
+    '<a href="https://app.clockify.me/tracker">Создана запись в Clockify</a>',
+    `Проект: ${escapeHtml(result.projectName)}`,
+    `Детализация: ${escapeHtml(result.taskName)}`,
+    `Время начала: ${escapeHtml(result.startMskView)}`,
+    `Длительность: ${escapeHtml(result.durationView)}`,
     "Спасибо, что ведёшь учёт рабочего времени!"
   ].join("\n");
 }
@@ -31,4 +38,3 @@ module.exports = {
   buildChoiceKeyboard,
   successMessage
 };
-
