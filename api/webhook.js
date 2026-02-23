@@ -83,58 +83,312 @@ function hasExplicitDateReference(text) {
 function extractProjectLabelSegment(text) {
   const source = normalizeText(text);
   if (!source) return "";
-  const match = source.match(/(?:^|\s)(?:project|проект)\s+(.+?)(?=\s(?:task|работа|задача)(?:\s|$)|$)/iu);
-  return match ? String(match[1] || "").trim() : "";
+  const match = source.match(/(?:^|\s)(?:project|проект)\s+/iu);
+  if (!match) return "";
+
+  const start = (match.index || 0) + String(match[0] || "").length;
+  let segment = source.slice(start).trim();
+  if (!segment) return "";
+
+  const stopMatch = segment.match(/\s(?:task|работа|задача|start|начало|время начала|duration|длительность)(?:\s|$)/iu);
+  if (stopMatch && typeof stopMatch.index === "number" && stopMatch.index >= 0) {
+    segment = segment.slice(0, stopMatch.index).trim();
+  }
+
+  return segment;
 }
 
-function hasNumericMarker(text) {
+const RU_UNITS = {
+  "ноль": 0,
+  "нуль": 0,
+  "один": 1,
+  "одна": 1,
+  "два": 2,
+  "две": 2,
+  "три": 3,
+  "четыре": 4,
+  "пять": 5,
+  "шесть": 6,
+  "семь": 7,
+  "восемь": 8,
+  "девять": 9
+};
+
+const RU_TEENS = {
+  "десять": 10,
+  "одиннадцать": 11,
+  "двенадцать": 12,
+  "тринадцать": 13,
+  "четырнадцать": 14,
+  "пятнадцать": 15,
+  "шестнадцать": 16,
+  "семнадцать": 17,
+  "восемнадцать": 18,
+  "девятнадцать": 19
+};
+
+const RU_TENS = {
+  "двадцать": 20,
+  "тридцать": 30,
+  "сорок": 40,
+  "пятьдесят": 50,
+  "шестьдесят": 60,
+  "семьдесят": 70,
+  "восемьдесят": 80,
+  "девяносто": 90
+};
+
+const EN_UNITS = {
+  "zero": 0,
+  "one": 1,
+  "two": 2,
+  "three": 3,
+  "four": 4,
+  "five": 5,
+  "six": 6,
+  "seven": 7,
+  "eight": 8,
+  "nine": 9
+};
+
+const EN_TEENS = {
+  "ten": 10,
+  "eleven": 11,
+  "twelve": 12,
+  "thirteen": 13,
+  "fourteen": 14,
+  "fifteen": 15,
+  "sixteen": 16,
+  "seventeen": 17,
+  "eighteen": 18,
+  "nineteen": 19
+};
+
+const EN_TENS = {
+  "twenty": 20,
+  "thirty": 30,
+  "forty": 40,
+  "fifty": 50,
+  "sixty": 60,
+  "seventy": 70,
+  "eighty": 80,
+  "ninety": 90
+};
+
+function parseRomanInt(token) {
+  if (!/^(?=[ivxlcdm]+$)[ivxlcdm]{1,8}$/i.test(token)) return null;
+  const src = String(token || "").toUpperCase();
+  const map = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+  let total = 0;
+  for (let i = 0; i < src.length; i += 1) {
+    const cur = map[src[i]];
+    const next = map[src[i + 1]] || 0;
+    if (!cur) return null;
+    total += cur < next ? -cur : cur;
+  }
+  return total > 0 ? total : null;
+}
+
+function parseRuNumberAt(tokens, index) {
+  const one = tokens[index];
+  const two = tokens[index + 1];
+  if (!one) return null;
+  if (Object.prototype.hasOwnProperty.call(RU_TEENS, one)) {
+    return { value: RU_TEENS[one], consumed: 1 };
+  }
+  if (Object.prototype.hasOwnProperty.call(RU_TENS, one)) {
+    const base = RU_TENS[one];
+    if (two && Object.prototype.hasOwnProperty.call(RU_UNITS, two)) {
+      return { value: base + RU_UNITS[two], consumed: 2 };
+    }
+    return { value: base, consumed: 1 };
+  }
+  if (Object.prototype.hasOwnProperty.call(RU_UNITS, one)) {
+    return { value: RU_UNITS[one], consumed: 1 };
+  }
+  return null;
+}
+
+function parseEnNumberAt(tokens, index) {
+  const one = tokens[index];
+  const two = tokens[index + 1];
+  if (!one) return null;
+  if (Object.prototype.hasOwnProperty.call(EN_TEENS, one)) {
+    return { value: EN_TEENS[one], consumed: 1 };
+  }
+  if (Object.prototype.hasOwnProperty.call(EN_TENS, one)) {
+    const base = EN_TENS[one];
+    if (two && Object.prototype.hasOwnProperty.call(EN_UNITS, two)) {
+      return { value: base + EN_UNITS[two], consumed: 2 };
+    }
+    return { value: base, consumed: 1 };
+  }
+  if (Object.prototype.hasOwnProperty.call(EN_UNITS, one)) {
+    return { value: EN_UNITS[one], consumed: 1 };
+  }
+  return null;
+}
+
+function extractNumericValues(text) {
   const source = normalizeText(text).toLowerCase();
-  if (!source) return false;
-  if (/\b\d{1,4}\b/.test(source)) return true;
-  return /\b(?=[ivxlcdm]+\b)[ivxlcdm]{1,8}\b/i.test(source);
-}
-
-function extractNumericMarkers(text) {
-  const source = normalizeText(text);
   if (!source) return [];
-
   const tokens = source.split(/\s+/).filter(Boolean);
-  const out = [];
+  const values = [];
   const seen = new Set();
 
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
     if (/^\d{1,4}$/.test(token)) {
-      if (!seen.has(token)) {
-        seen.add(token);
-        out.push(token);
+      const value = Number(token);
+      const key = String(value);
+      if (!seen.has(key)) {
+        seen.add(key);
+        values.push(key);
       }
       continue;
     }
 
-    if (/^(?=[ivxlcdm]+$)[ivxlcdm]{1,8}$/i.test(token)) {
-      const upper = token.toUpperCase();
-      if (!seen.has(upper)) {
-        seen.add(upper);
-        out.push(upper);
+    const romanValue = parseRomanInt(token);
+    if (romanValue != null) {
+      const key = String(romanValue);
+      if (!seen.has(key)) {
+        seen.add(key);
+        values.push(key);
       }
+      continue;
+    }
+
+    const ruParsed = parseRuNumberAt(tokens, i);
+    if (ruParsed) {
+      const key = String(ruParsed.value);
+      if (!seen.has(key)) {
+        seen.add(key);
+        values.push(key);
+      }
+      i += ruParsed.consumed - 1;
+      continue;
+    }
+
+    const enParsed = parseEnNumberAt(tokens, i);
+    if (enParsed) {
+      const key = String(enParsed.value);
+      if (!seen.has(key)) {
+        seen.add(key);
+        values.push(key);
+      }
+      i += enParsed.consumed - 1;
     }
   }
 
-  return out;
+  return values;
+}
+
+function hasNumericMarker(text) {
+  return extractNumericValues(text).length > 0;
+}
+
+function extractNumericMarkers(text) {
+  return extractNumericValues(text);
+}
+
+function stripNumericMarkers(text) {
+  const source = normalizeText(text).toLowerCase();
+  if (!source) return "";
+  const tokens = source.split(/\s+/).filter(Boolean);
+  const kept = [];
+
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (/^\d{1,4}$/.test(token)) continue;
+    if (parseRomanInt(token) != null) continue;
+
+    const ruParsed = parseRuNumberAt(tokens, i);
+    if (ruParsed) {
+      i += ruParsed.consumed - 1;
+      continue;
+    }
+
+    const enParsed = parseEnNumberAt(tokens, i);
+    if (enParsed) {
+      i += enParsed.consumed - 1;
+      continue;
+    }
+
+    kept.push(token);
+  }
+
+  return kept.join(" ").trim();
 }
 
 function enrichProjectQueryWithSourceNumerals(commandText, projectQuery) {
   const query = String(projectQuery || "").trim();
   if (!query) return query;
-  if (hasNumericMarker(query)) return query;
 
   const segment = extractProjectLabelSegment(commandText);
   if (!segment) return query;
 
-  const markers = extractNumericMarkers(segment);
-  if (!markers.length) return query;
+  const sourceMarkers = extractNumericMarkers(segment);
+  if (!sourceMarkers.length) return query;
 
-  return `${query} ${markers.join(" ")}`.trim();
+  const queryMarkers = extractNumericMarkers(query);
+  if (!queryMarkers.length) {
+    return `${query} ${sourceMarkers.join(" ")}`.trim();
+  }
+
+  const sameMarker = queryMarkers.some((marker) => sourceMarkers.includes(marker));
+  if (sameMarker) {
+    return query;
+  }
+
+  const queryBase = stripNumericMarkers(query);
+  if (!queryBase) {
+    return `${query} ${sourceMarkers.join(" ")}`.trim();
+  }
+
+  return `${queryBase} ${sourceMarkers.join(" ")}`.trim();
+}
+
+function enrichProjectQueryWithEmbeddedNumerals(commandText, projectQuery) {
+  const query = String(projectQuery || "").trim();
+  if (!query) return query;
+  if (hasNumericMarker(query)) return query;
+
+  const source = normalizeText(commandText).toLowerCase();
+  if (!source) return query;
+  const queryTokens = normalizeText(query).toLowerCase().split(/\s+/).filter(Boolean);
+  const sourceTokens = source.split(/\s+/).filter(Boolean);
+  if (!queryTokens.length || !sourceTokens.length) return query;
+
+  // Find numeric tokens immediately following a fuzzy-stem token from query (e.g. "powerapp 17").
+  const queryStems = new Set(queryTokens.map((t) => t.replace(/[^a-zа-я0-9]+/giu, "")));
+  const collected = [];
+  const seen = new Set();
+  for (let i = 0; i < sourceTokens.length; i += 1) {
+    const token = sourceTokens[i];
+    const stem = token.replace(/[^a-zа-я0-9]+/giu, "");
+    if (!stem) continue;
+    const matchedStem = [...queryStems].some((qStem) => qStem && (stem.includes(qStem) || qStem.includes(stem)));
+    if (!matchedStem) continue;
+
+    const nextOne = sourceTokens[i + 1] || "";
+    const nextTwo = sourceTokens[i + 2] || "";
+    const local = extractNumericMarkers(`${nextOne} ${nextTwo}`.trim());
+    for (const marker of local) {
+      if (!seen.has(marker)) {
+        seen.add(marker);
+        collected.push(marker);
+      }
+    }
+  }
+
+  if (!collected.length) return query;
+
+  return `${query} ${collected.join(" ")}`.trim();
+}
+
+function enrichProjectQueryNumerals(commandText, projectQuery) {
+  const withLabel = enrichProjectQueryWithSourceNumerals(commandText, projectQuery);
+  return enrichProjectQueryWithEmbeddedNumerals(commandText, withLabel);
 }
 
 async function sendDebug(telegram, chatId, cfg, lines) {
@@ -338,7 +592,7 @@ async function processCommand(cfg, telegram, chatId, telegramUser, bindingUser, 
   }
 
   if (parsed.ok) {
-    parsed.value.projectQuery = enrichProjectQueryWithSourceNumerals(commandText, parsed.value.projectQuery);
+    parsed.value.projectQuery = enrichProjectQueryNumerals(commandText, parsed.value.projectQuery);
     await sendDebug(telegram, chatId, cfg, [
       `parser: ${parserUsed}`,
       `projectQuery: ${parsed.value.projectQuery}`,
