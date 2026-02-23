@@ -238,6 +238,22 @@ function extractNumericValues(text) {
 
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
+    const digitChunks = token.match(/\d{1,4}/g);
+    if (digitChunks && digitChunks.length) {
+      for (const chunk of digitChunks) {
+        const value = Number(chunk);
+        const key = String(value);
+        if (!seen.has(key)) {
+          seen.add(key);
+          values.push(key);
+        }
+      }
+      // Continue scanning token for roman/word numerals only if there are no letters.
+      if (!/[a-zа-я]/i.test(token)) {
+        continue;
+      }
+    }
+
     if (/^\d{1,4}$/.test(token)) {
       const value = Number(token);
       const key = String(value);
@@ -300,6 +316,11 @@ function stripNumericMarkers(text) {
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
     if (/^\d{1,4}$/.test(token)) continue;
+    if (/\d/.test(token)) {
+      const reduced = token.replace(/\d{1,4}/g, "").replace(/[^a-zа-я]+/giu, "").trim();
+      if (reduced) kept.push(reduced);
+      continue;
+    }
     if (parseRomanInt(token) != null) continue;
 
     const ruParsed = parseRuNumberAt(tokens, i);
@@ -318,6 +339,14 @@ function stripNumericMarkers(text) {
   }
 
   return kept.join(" ").trim();
+}
+
+function splitAlphaDigitBoundaries(text) {
+  return String(text || "")
+    .replace(/([A-Za-zА-Яа-я])(\d)/g, "$1 $2")
+    .replace(/(\d)([A-Za-zА-Яа-я])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function enrichProjectQueryWithSourceNumerals(commandText, projectQuery) {
@@ -387,7 +416,8 @@ function enrichProjectQueryWithEmbeddedNumerals(commandText, projectQuery) {
 }
 
 function enrichProjectQueryNumerals(commandText, projectQuery) {
-  const withLabel = enrichProjectQueryWithSourceNumerals(commandText, projectQuery);
+  const normalizedQuery = splitAlphaDigitBoundaries(projectQuery);
+  const withLabel = enrichProjectQueryWithSourceNumerals(commandText, normalizedQuery);
   return enrichProjectQueryWithEmbeddedNumerals(commandText, withLabel);
 }
 
