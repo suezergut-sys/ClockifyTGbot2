@@ -69,6 +69,23 @@ const WEEKDAY_RULES = [
   { weekday: 7, regex: /(^|\s)(воскресенье|воскресенья|sunday)(\s|$)/u }
 ];
 
+const MERIDIEM_REGEX = /(?<!\S)(утра|дня|вечера|ночи|utra|dnya|vechera|nochi|am|pm)(?!\S)/u;
+const RU_HALF_TO_HOUR = {
+  "первого": 1,
+  "второго": 2,
+  "третьего": 3,
+  "четвертого": 4,
+  "четвёртого": 4,
+  "пятого": 5,
+  "шестого": 6,
+  "седьмого": 7,
+  "восьмого": 8,
+  "девятого": 9,
+  "десятого": 10,
+  "одиннадцатого": 11,
+  "двенадцатого": 12
+};
+
 function parseRuNumberToken(token) {
   return Object.prototype.hasOwnProperty.call(RU_NUMBERS, token) ? RU_NUMBERS[token] : null;
 }
@@ -127,6 +144,60 @@ function applyMeridiem(hour, meridiem) {
   return hour;
 }
 
+function applyWorkdayAfternoonHeuristic(hour, meridiem) {
+  if (meridiem) {
+    return applyMeridiem(hour, meridiem);
+  }
+  if (hour >= 1 && hour <= 7) {
+    return hour + 12;
+  }
+  return hour;
+}
+
+function stripNaturalTimeNoise(value, removeHourWords) {
+  let out = String(value || "");
+  out = out
+    .replace(/(?<!\S)(начало|время|start|at)(?!\S)/gu, " ")
+    .replace(/(?<!\S)(минута|минуты|минут|мин|m)(?!\S)/gu, " ")
+    .replace(/(?<!\S)(ровно|около|примерно)(?!\S)/gu, " ")
+    .replace(/(?<!\S)(утра|дня|вечера|ночи|utra|dnya|vechera|nochi|am|pm)(?!\S)/gu, " ");
+
+  if (removeHourWords) {
+    out = out.replace(/(?<!\S)(час|часа|часов|ч)(?!\S)/gu, " ");
+  }
+
+  return out.replace(/\s+/g, " ").trim();
+}
+
+function parseHalfPastPhrase(value) {
+  const source = String(value || "").trim().replace(/^в\s+/u, "");
+  const match = source.match(/^пол\s+([а-яё]+)$/u);
+  if (!match) return null;
+
+  const nextHour = RU_HALF_TO_HOUR[match[1]];
+  if (!nextHour) return null;
+
+  return {
+    hour: nextHour === 1 ? 12 : nextHour - 1,
+    minute: 30
+  };
+}
+
+function parseHourWordPhrase(value) {
+  const source = String(value || "").trim().replace(/^в\s+/u, "");
+  const match = source.match(/^час(?:\s+(.+))?$/u);
+  if (!match) return null;
+
+  const tail = String(match[1] || "").trim();
+  if (!tail) {
+    return { hour: 1, minute: 0 };
+  }
+
+  const minute = parseAnyMinutePhrase(tail.split(" ").filter(Boolean));
+  if (minute == null) return null;
+  return { hour: 1, minute };
+}
+
 function parseNaturalTime(input) {
   const clean = input
     .toLowerCase()
@@ -136,17 +207,26 @@ function parseNaturalTime(input) {
 
   if (!clean) return null;
 
-  const meridiemMatch = clean.match(/(?<!\S)(утра|дня|вечера|ночи|utra|dnya|vechera|nochi|am|pm)(?!\S)/u);
+  const meridiemMatch = clean.match(MERIDIEM_REGEX);
   const meridiem = meridiemMatch ? meridiemMatch[1] : null;
-  const withoutLabels = clean
-    .replace(/(?<!\S)(начало|время|start|at)(?!\S)/gu, " ")
-    .replace(/(?<!\S)(час|часа|часов|ч)(?!\S)/gu, " ")
-    .replace(/(?<!\S)(минута|минуты|минут|мин|m)(?!\S)/gu, " ")
-    .replace(/(?<!\S)(ровно|около|примерно)(?!\S)/gu, " ")
-    .replace(/(?<!\S)(утра|дня|вечера|ночи|utra|dnya|vechera|nochi|am|pm)(?!\S)/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  const soft = stripNaturalTimeNoise(clean, false);
+  if (!soft) return null;
 
+  const halfPast = parseHalfPastPhrase(soft);
+  if (halfPast) {
+    const hour = applyWorkdayAfternoonHeuristic(halfPast.hour, meridiem);
+    if (hour > 23) return null;
+    return { hour, minute: halfPast.minute };
+  }
+
+  const hourWord = parseHourWordPhrase(soft);
+  if (hourWord) {
+    const hour = applyWorkdayAfternoonHeuristic(hourWord.hour, meridiem);
+    if (hour > 23) return null;
+    return { hour, minute: hourWord.minute };
+  }
+
+  const withoutLabels = stripNaturalTimeNoise(clean, true);
   if (!withoutLabels) return null;
 
   const numericHm = withoutLabels.match(/\b(\d{1,2})\s+(\d{1,2})\b/);
@@ -154,7 +234,7 @@ function parseNaturalTime(input) {
     let h = Number(numericHm[1]);
     const m = Number(numericHm[2]);
     if (h <= 23 && m <= 59) {
-      h = applyMeridiem(h, meridiem);
+      h = applyWorkdayAfternoonHeuristic(h, meridiem);
       return { hour: h, minute: m };
     }
   }
@@ -163,7 +243,7 @@ function parseNaturalTime(input) {
   if (numericH) {
     let h = Number(numericH[1]);
     if (h <= 23) {
-      h = applyMeridiem(h, meridiem);
+      h = applyWorkdayAfternoonHeuristic(h, meridiem);
       return { hour: h, minute: 0 };
     }
   }
@@ -177,7 +257,7 @@ function parseNaturalTime(input) {
   const minute = parseAnyMinutePhrase(tokens.slice(1));
   if (minute == null) return null;
 
-  hour = applyMeridiem(hour, meridiem);
+  hour = applyWorkdayAfternoonHeuristic(hour, meridiem);
   if (hour > 23 || minute > 59) return null;
 
   return { hour, minute };
@@ -233,6 +313,8 @@ function parseTimePartDetailed(raw, cfg) {
 
   const dateRu = input.match(/(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?/);
   const dateIso = input.match(/(\d{4})-(\d{2})-(\d{2})/);
+  const meridiemMatch = input.match(MERIDIEM_REGEX);
+  const meridiem = meridiemMatch ? meridiemMatch[1] : null;
 
   let day = nowMsk;
   if (hasDayBeforeYesterday) {
@@ -264,6 +346,7 @@ function parseTimePartDetailed(raw, cfg) {
   if (asClock) {
     hour = Number(asClock[1]);
     minute = Number(asClock[2]);
+    hour = applyWorkdayAfternoonHeuristic(hour, meridiem);
   } else {
     const natural = parseNaturalTime(input);
     if (!natural) return { ok: false, errorCode: "invalid_time" };
