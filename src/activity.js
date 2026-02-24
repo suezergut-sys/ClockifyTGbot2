@@ -16,6 +16,25 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function maskEmailForDashboard(value) {
+  const email = normalizeEmail(value);
+  if (!email) return "";
+
+  const match = email.match(/^([^@]+)@(.+)\.ru$/i);
+  if (!match) return email;
+
+  const local = match[1];
+  const middle = match[2];
+  return `${local}@${"*".repeat(middle.length)}.ru`;
+}
+
+function maskIdentityForDashboard(value) {
+  const source = String(value || "").trim();
+  if (!source) return "";
+  if (source.includes("@")) return maskEmailForDashboard(source);
+  return source;
+}
+
 function hasKvEnv() {
   return Boolean(
     String(process.env.KV_REST_API_URL || "").trim()
@@ -335,13 +354,13 @@ function escapeHtml(value) {
 
 function buildDashboardHtml(cfg, state) {
   const summaryRows = buildSummaryRows(cfg, state)
-    .map((row) => `\n        <tr><td>${escapeHtml(row.label)}</td><td>${row.today}</td><td>${row.total}</td><td>${row.success}</td><td>${row.failed}</td></tr>`)
+    .map((row) => `\n        <tr><td>${escapeHtml(maskIdentityForDashboard(row.label))}</td><td>${row.today}</td><td>${row.total}</td><td>${row.success}</td><td>${row.failed}</td></tr>`)
     .join("");
 
   const eventsRows = state.events
     .slice(-200)
     .reverse()
-    .map((item) => `\n        <tr><td>${escapeHtml(item.dateMsk)}</td><td>${escapeHtml(statusLabel(item.status))}</td><td>${escapeHtml(item.email || item.tgId)}</td><td>${escapeHtml(item.reason)}</td></tr>`)
+    .map((item) => `\n        <tr><td>${escapeHtml(item.dateMsk)}</td><td>${escapeHtml(statusLabel(item.status))}</td><td>${escapeHtml(maskIdentityForDashboard(item.email || item.tgId))}</td><td>${escapeHtml(item.reason)}</td></tr>`)
     .join("");
 
   return `<!doctype html>
@@ -448,13 +467,28 @@ async function getUsageSnapshot(cfg, options) {
   const eventLimitRaw = Number(options && options.eventLimit ? options.eventLimit : 200);
   const eventLimit = Math.min(Math.max(Math.round(eventLimitRaw), 1), 1000);
   const recentEvents = state.events.slice(-eventLimit).reverse();
+  const maskEmails = Boolean(options && options.maskEmails);
+
+  const safeSummaryRows = maskEmails
+    ? summaryRows.map((row) => ({
+      ...row,
+      label: maskIdentityForDashboard(row.label)
+    }))
+    : summaryRows;
+
+  const safeRecentEvents = maskEmails
+    ? recentEvents.map((item) => ({
+      ...item,
+      email: item.email ? maskEmailForDashboard(item.email) : ""
+    }))
+    : recentEvents;
 
   return {
     generatedAt: DateTime.utc().toISO(),
     storage: getStorageMode(cfg),
     totalEvents: state.events.length,
-    summaryRows,
-    events: recentEvents
+    summaryRows: safeSummaryRows,
+    events: safeRecentEvents
   };
 }
 

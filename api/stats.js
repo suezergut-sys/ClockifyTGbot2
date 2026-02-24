@@ -11,7 +11,7 @@ module.exports = async function stats(req, res) {
 
   try {
     const cfg = getConfig();
-    const snapshot = await getUsageSnapshot(cfg, { eventLimit: 200 });
+    const snapshot = await getUsageSnapshot(cfg, { eventLimit: 200, maskEmails: true });
     res.setHeader("Cache-Control", "no-store, max-age=0");
     return res.status(200).json({
       ok: true,
